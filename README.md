@@ -64,9 +64,11 @@ If you find the code and paper helpful, a citation will be appreciated via:
 }
 ```
 
-## TODO
+## TODO & News
 
-- [ ] Release pretrained checkpoints and models by October
+- [x] Sep 29, 2024: We provide preprocessed keypoints and feature tracks here ( [Google Drive: precomputed_shared_v1.zip](https://drive.google.com/drive/folders/1Wg7T2v-1H2CWhw3lzoPVj_XnWCH9jXyG?usp=sharing) ). Now you can unzip it and put it into `self.precomputed = f'{data_root}/precomputed'` in `source/admin/local_example.py`. So you don't have to run flow net and track keypoint adjustment but use the finetuned ones from us.
+- [ ] Release all pretrained checkpoints and models by October.
+- [ ] Optimize test-only behavior from existing checkpoints.
 
 ## Method
 ![](docs/main_pipe.png)
@@ -145,7 +147,49 @@ We provide an example admin/local_example.py where all datasets are stored in da
 python -c "from source.admin.environment import create_default_local_file; create_default_local_file()"
 ```
 
-* Download the pre-trained model of [PDC-Net](https://arxiv.org/abs/2101.01710) [here](https://drive.google.com/file/d/1nOpC0MFWNV8N6ue0csed4I2K_ffX64BL/view). You will need to change the path to the pre-trained model in [train_settings/default_config.py](https://github.com/google-research/sparf/blob/main/train_settings/default_config.py#L190) `cfg.flow_ckpt_path` (L.190). 
+```python
+
+class EnvironmentSettings:
+def __init__(self, data_root='', debug=False, arg_log_dir='logs'):
+    # Current date and time
+    current_date = datetime.now().strftime("%m-%d-%Y")
+    current_time = datetime.now().strftime("%H-%M-%p")
+
+    # Base directory for logs
+    base_log_dir = arg_log_dir
+
+    # Create a directory for today's date
+    daily_log_dir = os.path.join(base_log_dir, current_date)
+
+    # Create a specific directory for this experiment based on the current time
+    experiment_log_dir = os.path.join(daily_log_dir, current_time)
+
+    # Set the directory paths
+    self.log_dir = experiment_log_dir
+    self.workspace_dir = os.path.join(experiment_log_dir, 'workspace')    # For saving network checkpoints
+    self.tensorboard_dir = os.path.join(experiment_log_dir, 'tensorboard')    # For tensorboard files
+    self.pretrained_networks = self.workspace_dir    # For saving pre-trained networks
+    self.eval_dir = os.path.join(experiment_log_dir, 'eval')    # For saving evaluations
+
+    # Data directories
+    if data_root=='':
+        self.llff = 'data/nerf_llff_data'
+        self.dtu = 'data/rs_dtu_4/DTU'
+        self.dtu_depth = 'data/'
+        self.dtu_mask = 'data/submission_data/idrmasks'
+        self.replica = 'data/Replica'
+        self.precomputed = 'data/precomputed'
+    else:
+        self.llff = f'{data_root}/nerf_llff_data'
+        self.dtu = f'{data_root}/rs_dtu_4/DTU'
+        self.dtu_depth = f'{data_root}/' # the dataset loader will append /Depth to it
+        self.dtu_mask = f'{data_root}/submission_data/idrmasks'
+        self.replica = f'{data_root}/Replica'
+        self.precomputed = f'{data_root}/precomputed' # precomputed keypoints and feature tracks store location
+
+```
+
+* Download the pre-trained model of [PDC-Net](https://arxiv.org/abs/2101.01710) [here](https://drive.google.com/file/d/1nOpC0MFWNV8N6ue0csed4I2K_ffX64BL/view). You will need to change the path to the pre-trained model in [train_settings/default_config.py](https://github.com/Wayne-Mai/traf_public/blob/master/train_settings/default_config.py) `cfg.flow_ckpt_path` (L.190). 
 
 
 ## Run
