@@ -1,11 +1,72 @@
-# TrackNeRF: Bundle Adjusting NeRF from Sparse and Noisy Views via Feature Tracks
+# TrackNeRF: Bundle Adjusting NeRF from Sparse and Noisy Views via Feature Tracks [ECCV'2024]
 
 ![](docs/main_pull.png)
 
-*This repo contains the official implementation for TrackNeRF paper.*
+*This repo contains the official implementation for TrackNeRF paper.* 
 
-**Authors: Jinjie Mai et al.
-Institute: KAUST et al.**
+[Jinjie Mai](https://scholar.google.com/citations?user=ksCEO0IAAAAJ&hl=en)<sup>1</sup>, 
+[Wenxuan Zhu](https://cemse.kaust.edu.sa/ivul/people/person/wenxuan-zhu)<sup>1</sup>, 
+[Sara Rojas Martinez](https://scholar.google.com/citations?user=7vnDKiwAAAAJ&hl=en)<sup>1</sup>, 
+[Jesus Zarzar](https://scholar.google.com/citations?user=DWis350AAAAJ&hl=en)<sup>1</sup>, 
+[Abdullah Hamdi](https://abdullahamdi.com/)<sup>2</sup>, 
+[Guocheng Qian](https://guochengqian.github.io/)<sup>3</sup>, 
+[Bing Li](https://scholar.google.com/citations?user=xBiftlUAAAAJ&hl=en)<sup>1</sup>, 
+[Silvio Giancola](https://www.silviogiancola.com/)<sup>1</sup>, 
+[Bernard Ghanem](https://www.bernardghanem.com/)<sup>1</sup>
+
+<sup>1</sup>King Abdullah University of Science and Technology,   <sup>2</sup>Visual Geometry Group,
+University of Oxford,  <sup>3</sup>Snap Inc. 
+
+
+<!-- **Authors: Jinjie Mai et al.
+Institute: KAUST et al.** -->
+
+
+
+## Citation
+
+Kudos to the great work [SPARF](https://github.com/google-research/sparf) and [PixSfM](https://github.com/cvg/pixel-perfect-sfm), from which we borrow the code and build TrackNeRF upon:
+```tex
+
+@inproceedings{lindenberger2021pixsfm,
+  author    = {Philipp Lindenberger and
+               Paul-Edouard Sarlin and
+               Viktor Larsson and
+               Marc Pollefeys},
+  title     = {{Pixel-Perfect Structure-from-Motion with Featuremetric Refinement}},
+  booktitle = {ICCV},
+  year      = {2021},
+}
+
+
+@inproceedings{sparf2023,
+  title={SPARF: Neural Radiance Fields from Sparse and Noisy Poses},
+  author = {Truong, Prune and Rakotosaona, Marie-Julie and Manhardt, Fabian and Tombari, Federico},
+  publisher = {{IEEE/CVF} Conference on Computer Vision and Pattern Recognition, {CVPR}},
+  year = {2023}
+}
+```
+
+
+If you find the code and paper helpful, a citation will be appreciated via:
+
+```tex
+@misc{mai2024tracknerfbundleadjustingnerf,
+      title={TrackNeRF: Bundle Adjusting NeRF from Sparse and Noisy Views via Feature Tracks}, 
+      author={Jinjie Mai and Wenxuan Zhu and Sara Rojas 
+          and Jesus Zarzar and Abdullah Hamdi and Guocheng Qian 
+          and Bing Li and Silvio Giancola and Bernard Ghanem},
+      year={2024},
+      eprint={2408.10739},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2408.10739}, 
+}
+```
+
+## TODO
+
+- [ ] Release pretrained checkpoints and models by October
 
 ## Method
 ![](docs/main_pipe.png)
@@ -174,32 +235,6 @@ The framework in `source/` consists of the following sub-modules.
 
 ![](docs/main_vis.png)
 
-## Acknowledgement
-
-Kudos to the great work [SPARF](https://github.com/google-research/sparf), from which we borrow the code and build TrackNeRF upon:
-```tex
-@inproceedings{sparf2023,
-  title={SPARF: Neural Radiance Fields from Sparse and Noisy Poses},
-  author = {Truong, Prune and Rakotosaona, Marie-Julie and Manhardt, Fabian and Tombari, Federico},
-  publisher = {{IEEE/CVF} Conference on Computer Vision and Pattern Recognition, {CVPR}},
-  year = {2023}
-}
-```
-
-
-If you find the code and paper helpful, a citation will be appreciated via:
-
-```tex
-@misc{mai_track_nerf,
-  author = {J. Mai et al.},
-  title = {TrackNeRF: Bundle Adjusting NeRF from Sparse and Noisy Views via Feature Tracks},
-  year = {2024}, 
-  note = {GitHub repository},
-  publisher = {GitHub},
-  journal = {GitHub project},
-  howpublished = {\url{https://github.com/Wayne-Mai/traf_public}}
-}
-```
 
 
 
