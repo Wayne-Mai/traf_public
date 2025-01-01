@@ -35,7 +35,7 @@ from source.utils.vis_rendering import *
 from source.training.core.loss_factory import define_loss
 
 # ============================ main engine for training and evaluation ============================
-        
+
 class PerSceneTrainer(IterBasedTrainer):
     """Base class for NeRF or joint pose-NeRF training and evaluation
     """
@@ -66,7 +66,7 @@ class PerSceneTrainer(IterBasedTrainer):
         self.logger.info("loading training data...")
         self.train_data, train_sampler = create_dataset(opt, mode='train')
         train_loader = self.train_data.setup_loader(shuffle=True)
-        
+
         self.logger.info("loading test data...")
         if opt.val_on_test: eval_split = "test" # default false
         self.test_data = create_dataset(opt, mode=eval_split)
@@ -117,11 +117,10 @@ class PerSceneTrainer(IterBasedTrainer):
 
         # forward
         output_dict, result_dict, plotting_dict = self.train_step(self.iteration, data_dict)
-        
+
         # backward & optimization
         self.update_parameters(result_dict['loss'])
         return output_dict, result_dict, plotting_dict
-
 
     def update_parameters(self, loss_out: Dict[str, Any]):
         """ Update weights of mlp"""
@@ -140,7 +139,6 @@ class PerSceneTrainer(IterBasedTrainer):
             if self.scheduler is not None: self.scheduler.step()
         return 
 
-
     def train_iteration(self, data_dict: Dict[str, Any]):
         self.before_train_step(self.iteration, data_dict)
         self.timer.add_prepare_time()
@@ -151,14 +149,14 @@ class PerSceneTrainer(IterBasedTrainer):
                 self.settings.ratio_end_joint_nerf_pose_refinement \
                 if self.settings.ratio_end_joint_nerf_pose_refinement is not None else \
                     self.settings.end_joint_nerf_pose_refinement  
-            
+
             if self.iteration < iter_end_joint_nerf_pose_refinement: # 30000
                 # joint training of pose and NeRF
                 output_dict, result_dict, plotting_dict = self.train_iteration_nerf_pose_flow(data_dict) 
             else:
                 # training of NeRF with frozen poses
                 if self.iteration == iter_end_joint_nerf_pose_refinement and self.settings.restart_nerf:
-                    # restart nerf 
+                    # restart nerf
                     self.net.re_initialize() 
 
                     # define optimizer and scheduler
@@ -173,18 +171,17 @@ class PerSceneTrainer(IterBasedTrainer):
         self.timer.add_process_time()
         self.after_train_step(self.iteration, data_dict, output_dict, result_dict)
         result_dict = self.release_tensors(result_dict)
-        
+
         self.summary_board.update_from_result_dict(result_dict)
         self.write_image('train', plotting_dict, self.iteration)
         return
-
 
     def set_train_mode(self):
         self.training = True
         self.net.train()
         if self.settings.use_flow:
             # THIS IS IMPORTANT
-            # should always be in eval mode 
+            # should always be in eval mode
             self.flow_net.eval()
         torch.set_grad_enabled(True)
 
@@ -194,7 +191,7 @@ class PerSceneTrainer(IterBasedTrainer):
         if self.settings.use_flow:
             self.flow_net.eval()
         torch.set_grad_enabled(False)
-    
+
     def return_model_dict(self):
         state_dict = {}
         state_dict['nerf_net'] = self.net.state_dict()
@@ -202,7 +199,7 @@ class PerSceneTrainer(IterBasedTrainer):
         if hasattr(self, 'pose_net'):
             state_dict['pose_net'] = self.pose_net.state_dict()
         return state_dict
-    
+
     def load_state_dict(self, model_dict, do_partial_load=False):
 
         if not 'nerf_net' in model_dict.keys():
@@ -211,7 +208,7 @@ class PerSceneTrainer(IterBasedTrainer):
             else:
                 self.net.load_state_dict(model_dict, strict=True)   
             return
-        
+
         assert 'nerf_net' in model_dict.keys()
         self.logger.info('Loading the nerf model')
         if do_partial_load:
@@ -227,7 +224,7 @@ class PerSceneTrainer(IterBasedTrainer):
             self.logger.info('Loading the poses')
             self.pose_net.load_state_dict(model_dict['pose_net'], strict=True)
         return 
-    
+
     def run_debug(self, load_latest: bool=False, make_validation_first: bool=False):
         """
         Main training loop function. 
@@ -266,7 +263,7 @@ class PerSceneTrainer(IterBasedTrainer):
         self.before_train()
         self.optimizer.zero_grad()
         if self.optimizer_pose is not None: self.optimizer_pose.zero_grad()
-        
+
         initial_it = self.iteration
         # important to exclude it for inference pose estimation
         while self.iteration < initial_it + 10:
@@ -275,7 +272,7 @@ class PerSceneTrainer(IterBasedTrainer):
             # here loads the full scene for training
             data_dict = self.train_data.all
             data_dict['iter'] = self.iteration
-            # dict_keys(['idx', 'image', 'intr', 'pose']), all images of the scene already stacked here. 
+            # dict_keys(['idx', 'image', 'intr', 'pose']), all images of the scene already stacked here.
 
             self.train_iteration(data_dict)  # where the loss is computed, gradients backpropagated and so on, 
 
@@ -323,9 +320,96 @@ class PerSceneTrainer(IterBasedTrainer):
         # self.eval_after_training(plot=self.settings.plot)
         # self.eval_after_training(load_best_model=True)
         self.logger.critical(message)
-    
+
     def generate_videos_pose(self, opt: Dict[str, Any]):
         raise NotImplementedError
+
+    def test_only(self):
+        self.logger.info('DOING EVALUATION ONLY')
+        model_name = self.settings.model
+        args = self.settings
+        args.expname = self.settings.script_name
+        args.loss_type = 'photometric'
+        args.loss_weight.render = 0.
+
+        # if load_best_model:
+        checkpoint_path = self.settings.test_model_path
+        self.logger.info('Loading {}'.format(checkpoint_path))
+        weights = torch.load(checkpoint_path, map_location=torch.device('cpu'))
+        if hasattr(self, 'load_state_dict'):
+            self.load_state_dict(weights['state_dict'])
+        else:
+            self.net.load_state_dict(weights['state_dict'], strict=True)
+        if 'iteration' in weights.keys():
+            self.iteration = weights['iteration']
+
+        # define name of experiment
+        dataset_name = args.dataset
+        if hasattr(args, 'factor') and args.factor != 1:
+            dataset_name += "_factor_" + str(args.factor)
+        elif hasattr(args, 'llff_img_factor') and args.llff_img_factor != 1:
+            dataset_name += "_factor_" + str(args.llff_img_factor)
+        if hasattr(args, 'resize') and args.resize:
+            dataset_name += "_{}x{}".format(args.resize[0], args.resize[1]) if len(args.resize) == 2 else "_" + str(args.resize)
+        elif hasattr(args, 'resize_factor') and args.resize_factor:
+            dataset_name += "_resizefactor_" + str(args.resize_factor)
+
+        # define the output directory where the metrics (and qualitative results) will be stored
+        if self.debug:
+            out_dir = os.path.join(args.env.eval_dir + '_debug', dataset_name)
+        else:
+            out_dir = os.path.join(args.env.eval_dir, dataset_name)
+
+        if args.train_sub is None:
+            out_dir = os.path.join(out_dir, 'all_training_views')
+        else:
+            out_dir = os.path.join(out_dir, f'{args.train_sub}_training_views')
+
+        out_dir = os.path.join(out_dir, args.scene)
+        out_dir = os.path.join(out_dir, self.settings.module_name_for_eval)
+        extra_out_dir = os.path.join(out_dir, args.expname + '_{}'.format(self.iteration))  # to save qualitative figures
+
+        extra_out_dir_train = os.path.join(out_dir, args.expname + 'train_{}'.format(self.iteration))  # to save qualitative figures
+
+        self.logger.critical('Experiment: {} / {}'.format(self.settings.module_name, args.expname))
+        self.logger.critical("saving results to {}...".format(out_dir))
+        os.makedirs(out_dir, exist_ok=True)
+
+        # load the test step
+        args.val_sub = None  
+        self.load_dataset(args, eval_split='test')
+        save_all = {}
+        test_optim_options = [True, False] if model_name in ["joint_pose_nerf_training", 'nerf_fixed_noisy_poses'] else [False]
+        for test_optim in test_optim_options:
+            self.logger.info('test pose optim : {}'.format(test_optim))
+            args.optim.test_photo = test_optim
+
+            possible_to_plot = True
+            if test_optim is False and model_name in ["joint_pose_nerf_training", 'nerf_fixed_noisy_poses']:
+                possible_to_plot = False
+
+            train_results_dict = self.evaluate_full_train(args, plot=True and possible_to_plot, 
+                                              save_ind_files=True and possible_to_plot, 
+                                              out_scene_dir=extra_out_dir_train)
+
+            results_dict = self.evaluate_full(args, plot=True and possible_to_plot, 
+                                              save_ind_files=True and possible_to_plot, 
+                                              out_scene_dir=extra_out_dir)
+
+            if test_optim:
+                save_all['w_test_optim'] = results_dict
+            elif model_name in ["joint_pose_nerf_training", 'nerf_fixed_noisy_poses']:
+                save_all['without_test_optim'] = results_dict
+            else:
+                # nerf
+                save_all = results_dict
+
+        save_all['iteration'] = self.iteration
+        name_file = '{}.txt'.format(args.expname)
+        self.logger.critical('Saving json file to {}/{}'.format(out_dir, name_file))
+        with open("{}/{}".format(out_dir, name_file), "w+") as f:
+            json.dump(save_all, f, indent=4)
+        return 
 
     def run(self, load_latest: bool=True, make_validation_first: bool=False):
         """
@@ -334,6 +418,10 @@ class PerSceneTrainer(IterBasedTrainer):
         """
         assert self.train_loader is not None
         assert self.val_loader is not None
+
+        if self.settings.test_only:
+            self.test_only()
+            return
 
         if self.settings.render_video_pose_only:
             self.generate_videos_pose(self.settings)
@@ -359,10 +447,10 @@ class PerSceneTrainer(IterBasedTrainer):
         if self.settings.render_video_only:
             self.generate_videos_synthesis(self.settings)
             return 
-            
+
         if make_validation_first and self.iteration == 0:
             self.inference()
-            
+
         self.set_train_mode()
         self.summary_board.reset_all()
         self.timer.reset()
@@ -371,14 +459,13 @@ class PerSceneTrainer(IterBasedTrainer):
         self.optimizer.zero_grad()
         if self.optimizer_pose is not None: self.optimizer_pose.zero_grad()
 
-        
         while self.iteration < self.max_iteration:
             self.iteration += 1
 
-            # here loads the full scene for training, i.e. all the images 
+            # here loads the full scene for training, i.e. all the images
             data_dict = self.train_data.all # ['idx', 'rgb_path', 'scene', 'depth_range', 'image', 'intr', 'pose']
             data_dict['iter'] = self.iteration
-            # dict_keys(['idx', 'image', 'intr', 'pose']), all images of the scene already stacked here. 
+            # dict_keys(['idx', 'image', 'intr', 'pose']), all images of the scene already stacked here.
 
             self.train_iteration(data_dict)  # where the loss is computed, gradients backpropagated and so on, 
 
@@ -421,23 +508,22 @@ class PerSceneTrainer(IterBasedTrainer):
                 self.delete_old_checkpoints()  # keep only the most recent set of checkpoints
 
             torch.cuda.empty_cache()
-            
+
         self.after_train()
-        
+
         # run validation
         self.inference()
-        
-        
+
         message = 'Training finished.'
         self.generate_videos_synthesis(self.settings) 
         if self.settings.do_eval:
-            # save metrics! 
+            # save metrics!
             message = 'Training finished. Running evaluation.'
             self.eval_after_training(plot=self.settings.plot, 
                                      save_ind_files=self.settings.save_ind_files)
             # self.eval_after_training(load_best_model=True)
         self.logger.critical(message)
-        
+
     @torch.no_grad()
     def make_result_dict(self,opt: Dict[str, Any],data_dict: Dict[str, Any],output_dict: Dict[str, Any],
                          loss: Dict[str, Any],metric: Dict[str, Any]=None, split: str='train'):
@@ -449,7 +535,6 @@ class PerSceneTrainer(IterBasedTrainer):
             for key,value in metric.items():
                 stats_dict["{}".format(key)] = value
         return stats_dict
-
 
     @torch.no_grad()
     def val_step(self, iteration: int, data_dict: Dict[str, Any]
@@ -463,7 +548,7 @@ class PerSceneTrainer(IterBasedTrainer):
         output_dict['mse'], output_dict['mse_fine'] = compute_mse_on_rays(data_dict, output_dict)
 
         # to compute the loss:
-        # poses_w2c = self.net.get_w2c_pose(self.settings, data_dict, mode='val')  
+        # poses_w2c = self.net.get_w2c_pose(self.settings, data_dict, mode='val')
         # data_dict.poses_w2c = poses_w2c
         # loss_dict, stats_dict, plotting_dict = self.loss_module.compute_loss\
         #     (self.settings, data_dict, output_dict, iteration=iteration, mode="val")
@@ -471,13 +556,13 @@ class PerSceneTrainer(IterBasedTrainer):
         results_dict = self.make_result_dict(self.settings, data_dict, output_dict, loss={}, split='val')
         # results_dict.update(stats_dict)
         # results_dict['loss'] = loss_dict['all']
-        
+
         results_dict['best_value'] = - results_dict['PSNR_fine'] if 'PSNR_fine' in results_dict.keys() \
             else - results_dict['PSNR']
-        
+
         # run some evaluations
         gt_image = data_dict.image.reshape(-1, 3, H, W)
-        
+
         # coarse prediction
         pred_rgb_map = output_dict.rgb.reshape(-1, H, W, 3).permute(0,3,1,2)  # (B, 3, H, W)
         ssim = ssim_loss(pred_rgb_map, gt_image).item()
@@ -497,7 +582,7 @@ class PerSceneTrainer(IterBasedTrainer):
 
             results_dict['ssim_fine'] = ssim
             results_dict['lpips_fine'] = lpips
-            
+
             if 'fg_mask' in data_dict.keys():
                 results_dict.update(compute_metrics_masked(data_dict, pred_rgb_map, gt_image, 
                                                            self.lpips_loss, suffix='_fine'))
@@ -518,7 +603,7 @@ class PerSceneTrainer(IterBasedTrainer):
         args = self.settings
         args.expname = self.settings.script_name
 
-        # the loss is redefined here as only the photometric one, in case the 
+        # the loss is redefined here as only the photometric one, in case the
         # test-time photometric optimization is used
         args.loss_type = 'photometric'
         args.loss_weight.render = 0.
@@ -544,7 +629,7 @@ class PerSceneTrainer(IterBasedTrainer):
             dataset_name += "_{}x{}".format(args.resize[0], args.resize[1]) if len(args.resize) == 2 else "_" + str(args.resize)
         elif hasattr(args, 'resize_factor') and args.resize_factor:
             dataset_name += "_resizefactor_" + str(args.resize_factor)
-        
+
         # define the output directory where the metrics (and qualitative results) will be stored
         if self.debug:
             out_dir = os.path.join(args.env.eval_dir + '_debug', dataset_name)
@@ -555,11 +640,11 @@ class PerSceneTrainer(IterBasedTrainer):
             out_dir = os.path.join(out_dir, 'all_training_views')
         else:
             out_dir = os.path.join(out_dir, f'{args.train_sub}_training_views')
-            
+
         out_dir = os.path.join(out_dir, args.scene)
         out_dir = os.path.join(out_dir, self.settings.module_name_for_eval)
         extra_out_dir = os.path.join(out_dir, args.expname + '_{}'.format(self.iteration))  # to save qualitative figures
-        
+
         extra_out_dir_train = os.path.join(out_dir, args.expname + 'train_{}'.format(self.iteration))  # to save qualitative figures
 
         self.logger.critical('Experiment: {} / {}'.format(self.settings.module_name, args.expname))
@@ -569,7 +654,7 @@ class PerSceneTrainer(IterBasedTrainer):
         # load the test step
         args.val_sub = None  
         self.load_dataset(args, eval_split='test')
-        
+
         save_all = {}
         test_optim_options = [True, False] if model_name in ["joint_pose_nerf_training", 'nerf_fixed_noisy_poses'] else [False]
         for test_optim in test_optim_options:
@@ -579,25 +664,23 @@ class PerSceneTrainer(IterBasedTrainer):
             possible_to_plot = True
             if test_optim is False and model_name in ["joint_pose_nerf_training", 'nerf_fixed_noisy_poses']:
                 possible_to_plot = False
-                
+
             train_results_dict=self.evaluate_full_train(args, plot=plot and possible_to_plot, 
                                               save_ind_files=save_ind_files and possible_to_plot, 
                                               out_scene_dir=extra_out_dir_train)
-            
+
             results_dict = self.evaluate_full(args, plot=plot and possible_to_plot, 
                                               save_ind_files=save_ind_files and possible_to_plot, 
                                               out_scene_dir=extra_out_dir)
-            
-            
 
             if test_optim:
                 save_all['w_test_optim'] = results_dict
             elif model_name in ["joint_pose_nerf_training", 'nerf_fixed_noisy_poses']:
                 save_all['without_test_optim'] = results_dict
             else:
-                # nerf 
+                # nerf
                 save_all = results_dict
-        
+
         save_all['iteration'] = self.iteration
 
         if load_best_model:
@@ -608,7 +691,6 @@ class PerSceneTrainer(IterBasedTrainer):
         with open("{}/{}".format(out_dir, name_file), "w+") as f:
             json.dump(save_all, f, indent=4)
         return 
-
 
     @torch.no_grad()
     def visualize(self,opt: Dict[str, Any],data_dict: Dict[str, Any],output_dict: Dict[str, Any],
@@ -638,7 +720,7 @@ class PerSceneTrainer(IterBasedTrainer):
             step (int, optional): Defaults to 0.
             split (str, optional): Defaults to "train".
         """
-        
+
         plotting_stats = {}
         to_plot, to_plot_fine = [], []
 
@@ -646,7 +728,7 @@ class PerSceneTrainer(IterBasedTrainer):
         scaling_factor_for_pred_depth = 1.
         if self.settings.model == 'joint_pose_nerf_training' and hasattr(self.net, 'sim3_est_to_gt_c2w'):
             # adjust the rendered depth, since the optimized scene geometry and poses are valid up to a 3D
-            # similarity, compared to the ground-truth. 
+            # similarity, compared to the ground-truth.
             scaling_factor_for_pred_depth = (self.net.sim3_est_to_gt_c2w.trans_scaling_after * self.net.sim3_est_to_gt_c2w.s) \
                 if self.net.sim3_est_to_gt_c2w.type == 'align_to_first' else self.net.sim3_est_to_gt_c2w.s
 
@@ -662,7 +744,7 @@ class PerSceneTrainer(IterBasedTrainer):
         idx_img_rendered = output_dict.idx_img_rendered[0]
 
         opacity = output_dict.opacity.view(-1, H, W, 1)[0]
-        
+
         image = (data_dict.image.permute(0, 2, 3, 1)[idx_img_rendered].cpu().numpy() * 255.).astype(np.uint8) # (B, 3, H, W), then (H, W, 3)
         depth_range = None
         if hasattr(data_dict, 'depth_range') and opt.nerf.depth.param == 'metric':
@@ -689,9 +771,9 @@ class PerSceneTrainer(IterBasedTrainer):
         to_plot += [torch.from_numpy(x.astype(np.float32)/255.) for x in 
                     [image, fine_pred_rgb_np_uint8, fine_pred_depth_colored, opacity, 
                     pred_image_var_colored, pred_depth_var_colored, image_rgb_map_error]]
-        
+
         name = 'gt-predc-depthc-acc-rgbvarc-depthvarc-err'        
-        
+
         if 'depth_fine' in output_dict:
             depth_map = output_dict.depth_fine.view(-1,H,W,1)[0] * scaling_factor_for_pred_depth
             # [B,H,W, 1] and then (H, W, 1)
@@ -730,7 +812,7 @@ class PerSceneTrainer(IterBasedTrainer):
             if len(to_plot_fine) > 0:
                 to_plot_fine += [torch.from_numpy(depth_gt_colored.astype(np.float32)/255.)]
             name += '-depthgt'
-        
+
         to_plot_img = torch.stack(to_plot, dim=0) # (N, H, W, 3)
         if len(to_plot_fine) > 0:
             to_plot_img = torch.cat((to_plot_img, torch.stack(to_plot_fine, dim=0)), dim=1) # (N, 2H, W, 3)
@@ -775,7 +857,6 @@ class PerSceneTrainer(IterBasedTrainer):
         fine_pred_rgb_np_uint8 = (255 * np.clip(rgb_map, a_min=0, a_max=1.)).astype(np.uint8)
         imageio.imwrite(os.path.join(rend_img_dir, name + '.png'), fine_pred_rgb_np_uint8)
 
-
         depth = rendered_depth[0].squeeze().cpu().numpy() # [B,H,W, 1] and then (H, W)
         fine_pred_depth_colored = colorize_np(depth, range=depth_range, append_cbar=False)
         fine_pred_depth_colored = (255 * fine_pred_depth_colored).astype(np.uint8)
@@ -800,7 +881,6 @@ class PerSceneTrainer(IterBasedTrainer):
         depth_var = rendered_depth_var[0].squeeze().cpu().numpy() # [B,H,W, 1] and then (H, W, 1)
         rgb_map = rendered_img.permute(0, 2, 3, 1)[0].cpu().numpy() # [B,3, H,W] and then (H, W, 3)
 
-        
         fine_pred_rgb_np_uint8 = (255 * np.clip(rgb_map, a_min=0, a_max=1.)).astype(np.uint8)
 
         fine_pred_depth_colored = colorize_np(depth, range=depth_range, append_cbar=False)

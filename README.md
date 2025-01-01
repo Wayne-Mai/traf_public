@@ -67,8 +67,8 @@ If you find the code and paper helpful, a citation will be appreciated via:
 ## TODO & News
 
 - [x] Sep 29, 2024: We provide preprocessed keypoints and feature tracks here ( [Google Drive: precomputed_shared_v1.zip](https://drive.google.com/drive/folders/1Wg7T2v-1H2CWhw3lzoPVj_XnWCH9jXyG?usp=sharing) ). Now you can unzip it and put it into `self.precomputed = f'{data_root}/precomputed'` in `source/admin/local_example.py`. So you don't have to run flow net and track keypoint adjustment but use the finetuned ones from us.
-- [ ] Release all pretrained checkpoints and models by October.
-- [ ] Optimize test-only behavior from existing checkpoints.
+- [x] We release DTU pretrained models at here: [Google Drive: pretrained ckpts](https://drive.google.com/drive/folders/1Wg7T2v-1H2CWhw3lzoPVj_XnWCH9jXyG?usp=sharing)
+- [x] Optimize test-only behavior from existing checkpoints.
 
 ## Method
 ![](docs/main_pipe.png)
@@ -150,42 +150,42 @@ python -c "from source.admin.environment import create_default_local_file; creat
 ```python
 
 class EnvironmentSettings:
-def __init__(self, data_root='', debug=False, arg_log_dir='logs'):
-    # Current date and time
-    current_date = datetime.now().strftime("%m-%d-%Y")
-    current_time = datetime.now().strftime("%H-%M-%p")
+  def __init__(self, data_root='', debug=False, arg_log_dir='logs'):
+      # Current date and time
+      current_date = datetime.now().strftime("%m-%d-%Y")
+      current_time = datetime.now().strftime("%H-%M-%p")
 
-    # Base directory for logs
-    base_log_dir = arg_log_dir
+      # Base directory for logs
+      base_log_dir = arg_log_dir
 
-    # Create a directory for today's date
-    daily_log_dir = os.path.join(base_log_dir, current_date)
+      # Create a directory for today's date
+      daily_log_dir = os.path.join(base_log_dir, current_date)
 
-    # Create a specific directory for this experiment based on the current time
-    experiment_log_dir = os.path.join(daily_log_dir, current_time)
+      # Create a specific directory for this experiment based on the current time
+      experiment_log_dir = os.path.join(daily_log_dir, current_time)
 
-    # Set the directory paths
-    self.log_dir = experiment_log_dir
-    self.workspace_dir = os.path.join(experiment_log_dir, 'workspace')    # For saving network checkpoints
-    self.tensorboard_dir = os.path.join(experiment_log_dir, 'tensorboard')    # For tensorboard files
-    self.pretrained_networks = self.workspace_dir    # For saving pre-trained networks
-    self.eval_dir = os.path.join(experiment_log_dir, 'eval')    # For saving evaluations
+      # Set the directory paths
+      self.log_dir = experiment_log_dir
+      self.workspace_dir = os.path.join(experiment_log_dir, 'workspace')    # For saving network checkpoints
+      self.tensorboard_dir = os.path.join(experiment_log_dir, 'tensorboard')    # For tensorboard files
+      self.pretrained_networks = self.workspace_dir    # For saving pre-trained networks
+      self.eval_dir = os.path.join(experiment_log_dir, 'eval')    # For saving evaluations
 
-    # Data directories
-    if data_root=='':
-        self.llff = 'data/nerf_llff_data'
-        self.dtu = 'data/rs_dtu_4/DTU'
-        self.dtu_depth = 'data/'
-        self.dtu_mask = 'data/submission_data/idrmasks'
-        self.replica = 'data/Replica'
-        self.precomputed = 'data/precomputed'
-    else:
-        self.llff = f'{data_root}/nerf_llff_data'
-        self.dtu = f'{data_root}/rs_dtu_4/DTU'
-        self.dtu_depth = f'{data_root}/' # the dataset loader will append /Depth to it
-        self.dtu_mask = f'{data_root}/submission_data/idrmasks'
-        self.replica = f'{data_root}/Replica'
-        self.precomputed = f'{data_root}/precomputed' # precomputed keypoints and feature tracks store location
+      # Data directories
+      if data_root=='':
+          self.llff = 'data/nerf_llff_data'
+          self.dtu = 'data/rs_dtu_4/DTU'
+          self.dtu_depth = 'data/'
+          self.dtu_mask = 'data/submission_data/idrmasks'
+          self.replica = 'data/Replica'
+          self.precomputed = 'data/precomputed'
+      else:
+          self.llff = f'{data_root}/nerf_llff_data'
+          self.dtu = f'{data_root}/rs_dtu_4/DTU'
+          self.dtu_depth = f'{data_root}/' # the dataset loader will append /Depth to it
+          self.dtu_mask = f'{data_root}/submission_data/idrmasks'
+          self.replica = f'{data_root}/Replica'
+          self.precomputed = f'{data_root}/precomputed' # precomputed keypoints and feature tracks store location
 
 ```
 
@@ -211,12 +211,25 @@ python run_trainval.py joint_pose_nerf_training/dtu tracknerf --train_sub 3 --sc
 ```
 where `joint_pose_nerf_training` means joint optimization of NeRF and noisy pose, `train_sub` means number of views, `tracknerf` means the config file in `train_settings/joint_pose_nerf_training/<tracknerf.py>`.
 
+
+
+### Pretrained Models
+We have pretrained models now at [Google Drive: pretrained ckpts](https://drive.google.com/drive/folders/1Wg7T2v-1H2CWhw3lzoPVj_XnWCH9jXyG?usp=sharing). The `traf_60k_dtu_3views` is trained on DTU noisy 3 views under 15% pose noise with 60k iteration,
+where `traf_23k_dtu_3views` is only trained with 23k iteration. Because though lengthy 60k iteration can reach a better performance, we find only 23k iteration is enough for TrackNeRF to reach good performance.
+
+For per-scene performance of these models, please check the main table and ablation study table regarding training efficiency.
+
+
 ### Validation
 
 If you want to load a pretrained checkpoint to re-do validation, run:
 
 
 ```bash
+# Selecting <ckpt_dir> <out_dir> <expname> to perform test metrics from a downloaded checkpoints from our Google Drive
+python run_trainval.py joint_pose_nerf_training/dtu <train_name>/tracknerf --train_sub 3 --scene scan21 --log_dir=./logs --plot=True --save_ind_files=True --test_only=True --test_model_path="<model>.pth.tar"
+
+
 # Selecting <train_module> <train_name> <nbr_input_views> <scene_name>
 # to regenerate the test metrics 
 python run_trainval.py <train_module> <train_name> --train_sub <nbr_input_views> --scene <scene_name> --test_metrics_only True 
@@ -226,6 +239,8 @@ python run_trainval.py <train_module> <train_name> --train_sub <nbr_input_views>
 
 # Selecting <ckpt_dir> <out_dir> <expname> to perform test metrics
 python eval.py --ckpt_dir <ckpt_dir> --out_dir <out_dir> --expname <expname> --plot True --save_inds_file True
+
+
 ```
 
 
@@ -260,6 +275,8 @@ The implementation is in `source/training/core/base_track_loss.py` and `source/t
 The depth smoothness loss encourages the image gradient align with depth gradient, which is implemented in `source/training/core/base_depth_reg_loss.py`.
 You can now enable it by set `settings_model.loss_type = 'photometric_and_track_and_depth_reg`, which means we are using photometric rendering loss, track loss and depth regularization loss.
 ### Code structure
+<details>
+<summary>Click to expand content</summary>
 The framework in `source/` consists of the following sub-modules.
 
 * training: 
@@ -276,6 +293,7 @@ The framework in `source/` consists of the following sub-modules.
     * geometry: Utils for geometric transformations 
     * colmap_initialization: Utils to initializes poses with COLMAP, run with different matchers
 * models: Contains NeRF model definition, different pose parametrization and the correspondence network wrapper. 
+</details>
 
 ![](docs/main_vis.png)
 

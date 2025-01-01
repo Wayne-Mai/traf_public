@@ -153,6 +153,8 @@ def main():
                         help='render_video_pose_only?')
     parser.add_argument('--test_metrics_only', type=bool, default=False,
                         help='test_metrics_only?')
+    parser.add_argument('--test_only', type=bool, default=False, help='only run the evaluation and visualization')
+    parser.add_argument('--test_model_path', type=str, default="", help='test model path')
     parser.add_argument('--plot', type=bool, default=False,
                         help='plot?')
     parser.add_argument('--save_ind_files', type=bool, default=False,
